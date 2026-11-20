@@ -1,0 +1,43 @@
+# Expense & Savings Tracker (PKR) — run everything with:  docker compose up --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-expense}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-expense}
+      POSTGRES_DB: ${POSTGRES_DB:-expense_tracker}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"   # optional: connect with psql/DBeaver on localhost:5433
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-expense} -d ${POSTGRES_DB:-expense_tracker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://${POSTGRES_USER:-expense}:${POSTGRES_PASSWORD:-expense}@db:5432/${POSTGRES_DB:-expense_tracker}
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string}
+      SEED_DEMO: ${SEED_DEMO:-true}
+    ports:
+      - "127.0.0.1:${API_PORT:-4000}:4000"  # optional direct API access
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${APP_PORT:-3000}:80"
+
+volumes:
+  pgdata:
